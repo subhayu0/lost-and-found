@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lost_n_found/features/batch/domain/entities/batch_entity.dart';
-import 'package:lost_n_found/features/batch/presentation/state/batch_state.dart';
+import 'package:lost_n_found/features/auth/presentation/state/auth_state.dart';
+import 'package:lost_n_found/features/auth/presentation/view_model/auth_view_model.dart';
 import 'package:lost_n_found/features/batch/presentation/view_model/batch_viewnodel.dart';
-import '../../../../app/routes/app_routes.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/theme_extensions.dart';
 import '../../../../core/widgets/gradient_button.dart';
 import '../../../../core/utils/snackbar_utils.dart';
-import '../../../dashboard/presentation/pages/dashboard_page.dart';
+
 
 class SignupPage extends ConsumerStatefulWidget {
   const SignupPage({super.key});
@@ -27,7 +26,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool _isLoading = false;
+  
   bool _agreedToTerms = false;
   String? _selectedBatch;
   String _selectedCountryCode = '+977'; // Default Nepal
@@ -42,7 +41,7 @@ final List<Map<String, String>> _countryCodes = [
 ];
 
 
-   List<BatchEntity> _batches=[];
+  //  final List<BatchEntity> _batches=[];
 
   @override
   void dispose() {
@@ -63,19 +62,18 @@ final List<Map<String, String>> _countryCodes = [
       return;
     }
 
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        AppRoutes.pushReplacement(context, const DashboardPage());
-      }
+   if (_formKey.currentState!.validate()) {
+      // // ya ko data lai view model ma pass garna paryo
+      ref
+          .read(authViewModelProvider.notifier)
+          .register(
+            fullName: _nameController.text,
+            email: _emailController.text,
+            username: _nameController.text.trim().split('@').first,
+            password: _passwordController.text,
+            phoneNumber: '$_selectedCountryCode${_phoneController.text}',
+            batchId: _selectedBatch,
+          );
     }
   }
 
@@ -92,12 +90,27 @@ final List<Map<String, String>> _countryCodes = [
   }
   @override
   Widget build(BuildContext context) {
-    final batchState=ref.watch(batchViewModelProvider);
+    final batchState = ref.watch(batchViewModelProvider);
+    // auth state
+    final authState = ref.watch(authViewModelProvider);
 
-    if(batchState.status==BatchStatus.loaded){
-      _batches=batchState.batches;
-    }
+    // listen for auth state changes
+    // ref.read
+    // ref.watch
 
+    ref.listen<AuthState>(authViewModelProvider, (previous, next) {
+      if (next.status == AuthStatus.error) {
+        SnackbarUtils.showError(
+          context,
+          next.errorMessage ?? 'Registration failed',
+        );
+      } else if (next.status == AuthStatus.registered) {
+         SnackbarUtils.showSuccess(
+          context,
+          next.errorMessage ?? 'Registration successful',
+        );
+      }
+    });
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -291,7 +304,7 @@ final List<Map<String, String>> _countryCodes = [
                       hintText: 'Choose your batch',
                       prefixIcon: Icon(Icons.school_rounded),
                     ),
-                    items: _batches.map((batch) {
+                    items: batchState.batches.map((batch) {
                       return DropdownMenuItem<String>(
                         value: batch.batchId,
                         child: Text(batch.batchName),
@@ -439,7 +452,7 @@ final List<Map<String, String>> _countryCodes = [
                   GradientButton(
                     text: 'Create Account',
                     onPressed: _handleSignup,
-                    isLoading: _isLoading,
+                    isLoading: authState.status == AuthStatus.loading,
                   ),
                   const SizedBox(height: 32),
 
